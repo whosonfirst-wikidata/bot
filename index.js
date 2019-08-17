@@ -7,9 +7,7 @@ const fetch = require('node-fetch');
 const { remove } = require('fs-extra');
 const { DateTime } = require('luxon');
 const promisePipe = require('promisepipe');
-const SQL = require('sql-template-strings');
 const { open } = require('sqlite');
-const FormData = require('form-data');
 const cookieFetch = require('fetch-cookie')(fetch);
 
 const mkdir = promisify(fs.mkdir);
@@ -151,13 +149,13 @@ async function main() {
 
     const loginUrl = new URL('https://www.wikidata.org/w/api.php');
 
-    const loginFormData = new FormData();
-    loginFormData.append('action', 'login');
-    loginFormData.append('format', 'json');
-    loginFormData.append('formatversion', 2);
-    loginFormData.append('lgname', 'Q23679');
-    loginFormData.append('lgpassword', process.env.PASSWORD);
-    loginFormData.append('lgtoken', logintoken);
+    const loginFormData = new URLSearchParams();
+    loginFormData.set('action', 'login');
+    loginFormData.set('format', 'json');
+    loginFormData.set('formatversion', 2);
+    loginFormData.set('lgname', 'Q23679');
+    loginFormData.set('lgpassword', process.env.PASSWORD);
+    loginFormData.set('lgtoken', logintoken);
 
     const loginResponse = await cookieFetch(loginUrl, {
         method: 'POST',
@@ -195,17 +193,17 @@ async function main() {
         if ( !claims[property] ) {
             console.log(`Editing ${other_id} start`);
             const editUrl = new URL('https://www.wikidata.org/w/api.php');
-            const editFormData = new FormData();
-            editFormData.append('action', 'wbcreateclaim');
-            editFormData.append('format', 'json');
-            editFormData.append('formatversion', 2);
-            editFormData.append('entity', other_id);
-            editFormData.append('snaktype', 'value');
-            editFormData.append('property', property);
+            const editFormData = new URLSearchParams();
+            editFormData.set('action', 'wbcreateclaim');
+            editFormData.set('format', 'json');
+            editFormData.set('formatversion', 2);
+            editFormData.set('entity', other_id);
+            editFormData.set('snaktype', 'value');
+            editFormData.set('property', property);
             // Must be surrounded by quotes!
-            editFormData.append('value', `"${id}"`);
-            editFormData.append('token', csrftoken);
-            editFormData.append('bot', 1);
+            editFormData.set('value', `"${id}"`);
+            editFormData.set('token', csrftoken);
+            editFormData.set('bot', 1);
 
             await retryFetch(editUrl, {
                 method: 'POST',
