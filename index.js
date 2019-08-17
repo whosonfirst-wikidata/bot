@@ -16,6 +16,28 @@ const mkdir = promisify(fs.mkdir);
 const unlink = promisify(fs.unlink);
 const exec = promisify(child_process.exec);
 
+function timeout(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function retryFetch(input, options) {
+    const response = await cookieFetch(input, options);
+    const data = await response.json();
+
+    if ( data.error && data.error.messages ) {
+        if (data.error.messages.find(({name}) => name === 'actionthrottledtext')) {
+            console.log(`Request Throttled, Retrying in 60 seconds`);
+            await timeout(1000 * 60);
+            return retryFetch(input, options)
+        } else {
+            console.error(data.error);
+            return data;
+        }
+    }
+
+    return data;
+}
+
 async function main() {
     const response = await fetch('https://dist.whosonfirst.org/sqlite/inventory.json');
     const data = await response.json();
@@ -185,16 +207,10 @@ async function main() {
             editFormData.append('token', csrftoken);
             editFormData.append('bot', 1);
 
-            const editResponse = await cookieFetch(editUrl, {
+            await retryFetch(editUrl, {
                 method: 'POST',
                 body: editFormData,
             });
-
-            const editRepsonseData = await editResponse.json();
-
-            if ( editRepsonseData.error ) {
-                console.error(editRepsonseData.error);
-            }
 
             console.log(`Editing ${other_id} end`);
         } else {
