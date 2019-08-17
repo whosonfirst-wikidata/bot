@@ -28,7 +28,7 @@ async function retryFetch(input, options) {
             await timeout(1000 * 60);
             return retryFetch(input, options)
         } else if (data.error.messages.find(({name}) => name === 'no-permission')) {
-            console.error('Permission Deneied!');
+            console.error('Permission Denied!');
             return data;
         } else {
             console.error(data.error);
