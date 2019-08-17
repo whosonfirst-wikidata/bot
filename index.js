@@ -123,7 +123,7 @@ async function main() {
     // Query the number of wikidata items for each database.
     for ( file of files ) {
         const db = await open(resolve(downloadsFolder, file.name));
-        const result = await db.all("SELECT id, other_id FROM concordances WHERE other_source = 'wd:id'");
+        const result = await db.all("SELECT c.id, c.other_id FROM concordances AS c JOIN spr ON c.id = spr.id WHERE c.other_source = 'wd:id' AND spr.is_deprecated != 1 GROUP BY spr.id");
 
         if (result.length > 0) {
             list = [
