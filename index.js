@@ -27,6 +27,9 @@ async function retryFetch(input, options) {
             console.log(`Request Throttled, Retrying in 60 seconds`);
             await timeout(1000 * 60);
             return retryFetch(input, options)
+        } else if (data.error.messages.find(({name}) => name === 'no-permission')) {
+            console.error('Permission Deneied!');
+            return data;
         } else {
             console.error(data.error);
             return data;
@@ -188,9 +191,12 @@ async function main() {
         url.searchParams.set('entity', other_id);
 
         const response = await fetch(url);
-        const { claims } = await response.json();
+        const data = await response.json();
+        const { claims } = data;
 
-        if ( !claims[property] ) {
+        if (typeof claims === 'undefined') {
+            console.error(data);
+        } else if ( !claims[property] ) {
             console.log(`Editing ${other_id} start`);
             const editUrl = new URL('https://www.wikidata.org/w/api.php');
             const editFormData = new URLSearchParams();
