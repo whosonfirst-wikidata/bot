@@ -1,0 +1,24 @@
+{
+  "name": "whosonfirst",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@commaai/unbzip2-stream": "^2.0.0",
+    "commander": "^3.0.0",
+    "fetch-cookie": "^0.7.3",
+    "form-data": "^2.5.0",
+    "fs-extra": "^8.1.0",
+    "hasha": "^5.0.0",
+    "luxon": "^1.17.2",
+    "node-fetch": "^2.6.0",
+    "promisepipe": "^3.0.0",
+    "sql-template-strings": "^2.2.2",
+    "sqlite": "^3.0.3"
+  }
+}
