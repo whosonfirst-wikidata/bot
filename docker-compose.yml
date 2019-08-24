@@ -1,10 +1,10 @@
 version: '3'
 services:
   bot:
-    image: 'node:lts'
+    build: ./
     env_file:
       - .env
     volumes:
-      - ./:/app:cached
-    working_dir: /app
-    command: 'node index.js'
+      - downloads:/app/downloads
+volumes:
+  downloads:
