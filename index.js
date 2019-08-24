@@ -168,6 +168,10 @@ async function main() {
 
     console.log(`Login Result: ${loginData.login.result}`);
 
+    if ( loginData.login.result !== 'Success' ) {
+        throw new Error('Login Failure');
+    }
+
     const csrfTokenUrl = new URL('https://www.wikidata.org/w/api.php');
     csrfTokenUrl.searchParams.set('action', 'query');
     csrfTokenUrl.searchParams.set('format', 'json');
