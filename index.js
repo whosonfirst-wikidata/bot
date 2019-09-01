@@ -171,10 +171,7 @@ async function main() {
         if ( cont ) {
             userContribsUrl.searchParams.set('uccontinue', cont);
         }
-        const userContribsResponse = await cookieFetch(userContribsUrl, {
-            method: 'POST',
-            body: loginFormData,
-        });
+        const userContribsResponse = await cookieFetch(userContribsUrl);
         const userContribsData = await userContribsResponse.json();
 
         // Set the continue.
