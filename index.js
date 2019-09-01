@@ -121,23 +121,6 @@ async function main() {
         console.log(`Decompressing ${file.name_compressed} end`);
     }
 
-    let list = [];
-
-    // Query the number of wikidata items for each database.
-    for ( file of files ) {
-        const db = await open(resolve(downloadsFolder, file.name));
-        const result = await db.all("SELECT c.id, c.other_id FROM concordances AS c JOIN spr ON c.id = spr.id WHERE c.other_source = 'wd:id' AND spr.is_deprecated != 1 GROUP BY spr.id");
-
-        if (result.length > 0) {
-            list = [
-                ...list,
-                ...result,
-            ];
-        }
-    }
-
-    console.log(`Number of Wikidata items: ${list.length.toLocaleString()}`);
-
     const loginTokenUrl = new URL('https://www.wikidata.org/w/api.php');
     loginTokenUrl.searchParams.set('action', 'query');
     loginTokenUrl.searchParams.set('format', 'json');
@@ -171,6 +154,60 @@ async function main() {
     if ( loginData.login.result !== 'Success' ) {
         throw new Error('Login Failure');
     }
+
+    const userContribsUrl = new URL('https://www.wikidata.org/w/api.php');
+    userContribsUrl.searchParams.set('action', 'query');
+    userContribsUrl.searchParams.set('format', 'json');
+    userContribsUrl.searchParams.set('formatversion', 2);
+    userContribsUrl.searchParams.set('list', 'usercontribs');
+    userContribsUrl.searchParams.set('uclimit', 'max');
+    userContribsUrl.searchParams.set('ucnamespace', 0);
+    userContribsUrl.searchParams.set('ucuser', 'Q23679');
+    userContribsUrl.searchParams.set('ucprop', 'title');
+
+    let cont = null;
+    let edited = new Set();
+    while (cont !== false) {
+        if ( cont ) {
+            userContribsUrl.searchParams.set('uccontinue', cont);
+        }
+        const userContribsResponse = await cookieFetch(userContribsUrl, {
+            method: 'POST',
+            body: loginFormData,
+        });
+        const userContribsData = await userContribsResponse.json();
+
+        // Set the continue.
+        if ( userContribsData.continue && userContribsData.continue.uccontinue ) {
+            cont = userContribsData.continue.uccontinue;
+        } else {
+            cont = false;
+        }
+
+        // Add each titles.
+        if ( userContribsData.query && userContribsData.query.usercontribs ) {
+            userContribsData.query.usercontribs.forEach(({ title }) => edited.add(title));
+        }
+    }
+
+    console.log(`Number of items edited previously: ${edited.size.toLocaleString()}`)
+
+    let list = [];
+
+    // Query the number of wikidata items for each database.
+    for ( file of files ) {
+        const db = await open(resolve(downloadsFolder, file.name));
+        const result = await db.all("SELECT c.id, c.other_id FROM concordances AS c JOIN spr ON c.id = spr.id WHERE c.other_source = 'wd:id' AND spr.is_deprecated != 1 GROUP BY spr.id");
+
+        if (result.length > 0) {
+            list = [
+                ...list,
+                ...result.filter(({ other_id }) => !edited.has( other_id )),
+            ];
+        }
+    }
+
+    console.log(`Number of Wikidata items to edit: ${list.length.toLocaleString()}`);
 
     const csrfTokenUrl = new URL('https://www.wikidata.org/w/api.php');
     csrfTokenUrl.searchParams.set('action', 'query');
