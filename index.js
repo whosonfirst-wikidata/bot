@@ -169,7 +169,7 @@ async function main() {
         const result = await fetch(queryUrl);
         const data = await result.json();
 
-        const ids = data.result.bindings.map(({ item }) => {
+        const ids = data.results.bindings.map(({ item }) => {
             const uri = new URL(item.value);
 
             return uri.pathname.split('/').pop();
