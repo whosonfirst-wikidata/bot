@@ -14,6 +14,42 @@ const mkdir = promisify(fs.mkdir);
 const unlink = promisify(fs.unlink);
 const exec = promisify(child_process.exec);
 
+const placetypes = new Map(Object.entries({
+    address: 'Q319608',
+    arcade: 'Q11315',
+    borough: 'Q5195043',
+    building: 'Q41176',
+    campus: 'Q209465',
+    concourse: 'Q862212',
+    constituency: 'Q192611',
+    continent: 'Q5107',
+    country: 'Q6256',
+    county: 'Q28575',
+    dependency: 'Q161243',
+    disputed: 'Q15239622',
+    empire: 'Q48349',
+    enclosure: 'Q5375483',
+    installation: 'Q20437094',
+    intersection: 'Q285783',
+    localadmin: 'Q66941850',
+    locality: 'Q486972',
+    macrocounty: 'Q66980082',
+    macrohood: 'Q66980180',
+    macroregion: 'Q3434769',
+    marinearea: 'Q66980635',
+    marketarea: 'Q6770790',
+    metroarea: 'Q1907114',
+    microhood: 'Q66980952',
+    neighbourhood: 'Q123705',
+    ocean: 'Q9430',
+    planet: 'Q634',
+    postalcode: 'Q37447',
+    region: 'Q3455524',
+    timezone: 'Q12143',
+    venue: 'Q17350442',
+    wing: 'Q1125776',
+}));
+
 function timeout(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -121,6 +157,28 @@ async function main() {
         console.log(`Decompressing ${file.name_compressed} end`);
     }
 
+    for ([type, id] of placetypes ) {
+        const query = `SELECT ?item
+        WHERE {
+            ?item wdt:P279* wd:${id}.
+        }`;
+        const queryUrl = new URL('https://query.wikidata.org/sparql');
+        queryUrl.searchParams.set('query', query);
+        queryUrl.searchParams.set('format', 'json');
+
+        const result = await fetch(queryUrl);
+        const data = await result.json();
+
+        const ids = data.result.bindings.map(({ item }) => {
+            const uri = new URL(item.value);
+
+            return uri.pathname.split('/').pop();
+        });
+
+        // Set the placetype implementations.
+        placetypes.set(id, new Set(ids));
+    }
+
     const loginTokenUrl = new URL('https://www.wikidata.org/w/api.php');
     loginTokenUrl.searchParams.set('action', 'query');
     loginTokenUrl.searchParams.set('format', 'json');
@@ -194,7 +252,7 @@ async function main() {
     // Query the number of wikidata items for each database.
     for ( file of files ) {
         const db = await open(resolve(downloadsFolder, file.name));
-        const result = await db.all("SELECT c.id, c.other_id FROM concordances AS c JOIN spr ON c.id = spr.id WHERE c.other_source = 'wd:id' AND spr.is_deprecated != 1 GROUP BY spr.id");
+        const result = await db.all("SELECT c.id, spr.placetype, c.other_id FROM concordances AS c JOIN spr ON c.id = spr.id WHERE c.other_source = 'wd:id' AND spr.is_deprecated != 1 GROUP BY spr.id");
 
         if (result.length > 0) {
             list = [
@@ -217,47 +275,77 @@ async function main() {
 
     const { csrftoken } = csrfTokenData.query.tokens;
 
-    const property = 'P6766';
+    const wofProperty = 'P6766';
+    const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
-    for ( { id, other_id } of list ) {
-        const url = new URL('https://www.wikidata.org/w/api.php');
-        url.searchParams.set('action', 'wbgetclaims');
-        url.searchParams.set('format', 'json');
-        url.searchParams.set('formatversion', 2);
-        url.searchParams.set('property', property);
-        url.searchParams.set('entity', other_id);
+    for ( { id, placetype, other_id } of list ) {
+        const wofUrl = new URL('https://www.wikidata.org/w/api.php');
+        wofUrl.searchParams.set('action', 'wbgetclaims');
+        wofUrl.searchParams.set('format', 'json');
+        wofUrl.searchParams.set('formatversion', 2);
+        wofUrl.searchParams.set('property', wofProperty);
+        wofUrl.searchParams.set('entity', other_id);
 
-        const response = await fetch(url);
-        const data = await response.json();
-        const { claims } = data;
+        const instanceUrl = new URL('https://www.wikidata.org/w/api.php');
+        instanceUrl.searchParams.set('action', 'wbgetclaims');
+        instanceUrl.searchParams.set('format', 'json');
+        instanceUrl.searchParams.set('formatversion', 2);
+        instanceUrl.searchParams.set('property', instanceProperty);
+        instanceUrl.searchParams.set('entity', other_id);
 
-        if (typeof claims === 'undefined') {
+        const [
+            wofData,
+            instanceData,
+        ] = Promise.all([
+            fetch(wofUrl).then(response => response.json()),
+            fetch(instanceUrl).then(response => response.json()),
+        ]);
+
+        if (typeof wofData.claims === 'undefined' || typeof instanceData.claims === 'undefined') {
+            console.log(`Skipping ${other_id} Error`);
             console.error(data);
-        } else if ( !claims[property] ) {
-            console.log(`Editing ${other_id} start`);
-            const editUrl = new URL('https://www.wikidata.org/w/api.php');
-            const editFormData = new URLSearchParams();
-            editFormData.set('action', 'wbcreateclaim');
-            editFormData.set('format', 'json');
-            editFormData.set('formatversion', 2);
-            editFormData.set('entity', other_id);
-            editFormData.set('snaktype', 'value');
-            editFormData.set('property', property);
-            // Must be surrounded by quotes!
-            editFormData.set('value', `"${id}"`);
-            editFormData.set('token', csrftoken);
-            editFormData.set('bot', 1);
-
-            await retryFetch(editUrl, {
-                method: 'POST',
-                body: editFormData,
-            });
-
-            console.log(`Editing ${other_id} end`);
-        } else {
-            console.log(`Skipping ${other_id}`);
         }
+
+        const claims = {
+            ...wofData.claims,
+            ...instanceData.claims,
+        };
+
+        const wofIds = claims[wofProperty].map(claim => claim.mainsnak.datavalue.value);
+
+        if (claims[wofProperty]) {
+            console.log(`Skipping ${other_id} with ${wofProperty} of ${wofIds.join(', ')}`);
+        }
+
+        const instanceOf = claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
+
+        const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
+
+        if (!isValidInstance) {
+            console.log(`Skipping ${other_id} with ${instanceProperty} of ${instanceOf.join(', ')}`);
+        }
+
+        console.log(`Editing ${other_id} start`);
+        const editUrl = new URL('https://www.wikidata.org/w/api.php');
+        const editFormData = new URLSearchParams();
+        editFormData.set('action', 'wbcreateclaim');
+        editFormData.set('format', 'json');
+        editFormData.set('formatversion', 2);
+        editFormData.set('entity', other_id);
+        editFormData.set('snaktype', 'value');
+        editFormData.set('property', wofProperty);
+        // Must be surrounded by quotes!
+        editFormData.set('value', `"${id}"`);
+        editFormData.set('token', csrftoken);
+        editFormData.set('bot', 1);
+
+        await retryFetch(editUrl, {
+            method: 'POST',
+            body: editFormData,
+        });
+
+        console.log(`Editing ${other_id} end`);
 
     }
 }
