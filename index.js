@@ -322,14 +322,16 @@ async function main() {
             continue;
         }
 
-        const instanceOf = claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
+        if (claims[instanceProperty]) {
+            const instanceOf = claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
 
-        if (instanceOf.length > 0) {
-            const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
+            if (instanceOf.length > 0) {
+                const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
 
-            if (!isValidInstance) {
-                console.log(`Skipping ${other_id} with ${instanceProperty} of ${instanceOf.join(', ')}`);
-                continue;
+                if (!isValidInstance) {
+                    console.log(`Skipping ${other_id} with ${instanceProperty} of ${instanceOf.join(', ')}`);
+                    continue;
+                }
             }
         }
 
