@@ -176,7 +176,8 @@ async function main() {
         });
 
         // Set the placetype implementations.
-        placetypes.set(id, new Set(ids));
+        console.log(`Class ${id} is subclassed by ${ids.length.toLocaleString()} items`)
+        placetypes.set(type, new Set(ids));
     }
 
     const loginTokenUrl = new URL('https://www.wikidata.org/w/api.php');
