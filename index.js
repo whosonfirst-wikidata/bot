@@ -306,6 +306,7 @@ async function main() {
         if (typeof wofData.claims === 'undefined' || typeof instanceData.claims === 'undefined') {
             console.log(`Skipping ${other_id} Error`);
             console.error(data);
+            continue;
         }
 
         const claims = {
@@ -317,14 +318,18 @@ async function main() {
 
         if (claims[wofProperty]) {
             console.log(`Skipping ${other_id} with ${wofProperty} of ${wofIds.join(', ')}`);
+            continue;
         }
 
         const instanceOf = claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
 
-        const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
+        if (instanceOf.length > 0) {
+            const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
 
-        if (!isValidInstance) {
-            console.log(`Skipping ${other_id} with ${instanceProperty} of ${instanceOf.join(', ')}`);
+            if (!isValidInstance) {
+                console.log(`Skipping ${other_id} with ${instanceProperty} of ${instanceOf.join(', ')}`);
+                continue;
+            }
         }
 
         console.log(`Editing ${other_id} start`);
