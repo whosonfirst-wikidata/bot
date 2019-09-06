@@ -305,7 +305,8 @@ async function main() {
 
         if (typeof wofData.claims === 'undefined' || typeof instanceData.claims === 'undefined') {
             console.log(`Skipping ${other_id} Error`);
-            console.error(data);
+            console.error(wofData);
+            console.error(instanceData);
             continue;
         }
 
