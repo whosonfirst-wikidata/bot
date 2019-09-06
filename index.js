@@ -298,7 +298,7 @@ async function main() {
         const [
             wofData,
             instanceData,
-        ] = Promise.all([
+        ] = await Promise.all([
             fetch(wofUrl).then(response => response.json()),
             fetch(instanceUrl).then(response => response.json()),
         ]);
