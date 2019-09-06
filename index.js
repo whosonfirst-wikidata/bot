@@ -315,9 +315,9 @@ async function main() {
             ...instanceData.claims,
         };
 
-        const wofIds = claims[wofProperty].map(claim => claim.mainsnak.datavalue.value);
-
         if (claims[wofProperty]) {
+            const wofIds = claims[wofProperty].map(claim => claim.mainsnak.datavalue.value);
+
             console.log(`Skipping ${other_id} with ${wofProperty} of ${wofIds.join(', ')}`);
             continue;
         }
