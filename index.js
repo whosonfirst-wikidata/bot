@@ -54,25 +54,59 @@ function timeout(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function retryFetch(input, options) {
-    const response = await cookieFetch(input, options);
-    const data = await response.json();
-
-    if ( data.error && data.error.messages ) {
-        if (data.error.messages.find(({name}) => name === 'actionthrottledtext')) {
-            console.log(`Request Throttled, Retrying in 60 seconds`);
-            await timeout(1000 * 60);
-            return retryFetch(input, options)
-        } else if (data.error.messages.find(({name}) => name === 'no-permission')) {
-            console.error('Permission Denied!');
-            return data;
-        } else {
-            console.error(data.error);
-            return data;
-        }
+/**
+ * Simple wrapper for fetch that implements an exponental backoff on network error.
+ *
+ * @param {string|URL} input
+ * @param {object} options
+ * @param {int} iteration
+ */
+async function backoffFetch(input, options, iteration = 0) {
+    try {
+        return await fetch(input, options);
+    } catch (e) {
+        const seconds = (2 ** iteration);
+        console.log(`Request Error, Retrying in ${seconds.toLocaleString()} seconds`);
+        console.log(e.message);
+        await timeout(seconds * 1000);
+        return backoffFetch(input, options, iteration + 1);
     }
+}
 
-    return data;
+/**
+ * Wrapper for cookieFetch that handles exponental backoff on network failure, and throttled retry.
+ *
+ * @param {string|URL} input
+ * @param {object} options
+ * @param {int} iteration
+ */
+async function retryFetch(input, options, iteration = 0) {
+    try {
+        const response = await cookieFetch(input, options);
+        const data = await response.json();
+
+        if ( data.error && data.error.messages ) {
+            if (data.error.messages.find(({name}) => name === 'actionthrottledtext')) {
+                console.log(`Request Throttled, Retrying in 60 seconds`);
+                await timeout(1000 * 60);
+                return retryFetch(input, options)
+            } else if (data.error.messages.find(({name}) => name === 'no-permission')) {
+                console.error('Permission Denied!');
+                return data;
+            } else {
+                console.error(data.error);
+                return data;
+            }
+        }
+
+        return data;
+    } catch (e) {
+        const seconds = (2 ** iteration);
+        console.log(`Request Error, Retrying in ${seconds.toLocaleString()} seconds`);
+        console.log(e.message);
+        await timeout(seconds * 1000);
+        return retryFetch(input, options, iteration + 1);
+    }
 }
 
 async function main() {
@@ -299,8 +333,8 @@ async function main() {
             wofData,
             instanceData,
         ] = await Promise.all([
-            fetch(wofUrl).then(response => response.json()),
-            fetch(instanceUrl).then(response => response.json()),
+            backoffFetch(wofUrl).then(response => response.json()),
+            backoffFetch(instanceUrl).then(response => response.json()),
         ]);
 
         if (typeof wofData.claims === 'undefined' || typeof instanceData.claims === 'undefined') {
