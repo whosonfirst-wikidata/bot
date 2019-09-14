@@ -356,13 +356,6 @@ async function main() {
             continue;
         }
 
-        const wofUrl = new URL('https://www.wikidata.org/w/api.php');
-        wofUrl.searchParams.set('action', 'wbgetclaims');
-        wofUrl.searchParams.set('format', 'json');
-        wofUrl.searchParams.set('formatversion', 2);
-        wofUrl.searchParams.set('property', wofProperty);
-        wofUrl.searchParams.set('entity', entityId);
-
         const instanceUrl = new URL('https://www.wikidata.org/w/api.php');
         instanceUrl.searchParams.set('action', 'wbgetclaims');
         instanceUrl.searchParams.set('format', 'json');
@@ -370,35 +363,17 @@ async function main() {
         instanceUrl.searchParams.set('property', instanceProperty);
         instanceUrl.searchParams.set('entity', entityId);
 
-        const [
-            wofData,
-            instanceData,
-        ] = await Promise.all([
-            backoffFetch(wofUrl).then(response => response.json()),
-            backoffFetch(instanceUrl).then(response => response.json()),
-        ]);
+        const instanceResponse = await backoffFetch(instanceUrl);
+        const instanceData = await instanceResponse.json();
 
-        if (typeof wofData.claims === 'undefined' || typeof instanceData.claims === 'undefined') {
+        if (typeof instanceData.claims === 'undefined') {
             console.log(`Skipping ${entityId} Error`);
-            console.error(wofData);
             console.error(instanceData);
             continue;
         }
 
-        const claims = {
-            ...wofData.claims,
-            ...instanceData.claims,
-        };
-
-        if (claims[wofProperty]) {
-            const wofIds = claims[wofProperty].map(claim => claim.mainsnak.datavalue.value);
-
-            console.log(`Skipping ${entityId} with ${wofProperty} of ${wofIds.join(', ')}`);
-            continue;
-        }
-
-        if (claims[instanceProperty]) {
-            const instanceOf = claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
+        if (instanceData.claims[instanceProperty]) {
+            const instanceOf = instanceData.claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
 
             if (instanceOf.length > 0) {
                 const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
