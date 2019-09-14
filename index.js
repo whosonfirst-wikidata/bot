@@ -301,7 +301,7 @@ async function main() {
                 AND c.other_source = 'gn:id'
                 AND c.other_id NOT IN (-99, -1, 0)
             GROUP BY spr.id
-            HAVING max(case when c.other_source = 'wd:id' then 0 else 1 end) = 1
+            HAVING NOT c.other_source = 'wd:id'
         `);
 
         if (result.length > 0) {
