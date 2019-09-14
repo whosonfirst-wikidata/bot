@@ -286,6 +286,8 @@ async function main() {
 
     // Query the number of wikidata items for each database.
     for ( file of files ) {
+        console.log(`Querying ${file.name} start`);
+
         const db = await open(resolve(downloadsFolder, file.name));
         const result = await db.all(`
             SELECT
@@ -308,6 +310,8 @@ async function main() {
                 ...result,
             ];
         }
+
+        console.log(`Querying ${file.name} end`);
     }
 
     console.log(`Number of Wikidata items to edit: ${list.length.toLocaleString()}`);
