@@ -287,12 +287,25 @@ async function main() {
     // Query the number of wikidata items for each database.
     for ( file of files ) {
         const db = await open(resolve(downloadsFolder, file.name));
-        const result = await db.all("SELECT c.id, spr.placetype, c.other_id FROM concordances AS c JOIN spr ON c.id = spr.id WHERE c.other_source = 'wd:id' AND spr.is_deprecated != 1 GROUP BY spr.id");
+        const result = await db.all(`
+            SELECT
+                spr.id,
+                spr.placetype,
+                c.other_id
+            FROM spr
+            INNER JOIN concordances AS c ON spr.id = c.id
+            WHERE
+                spr.is_deprecated != 1
+                AND c.other_source = 'gn:id'
+                AND c.other_id NOT IN (-99, -1, 0)
+            GROUP BY spr.id
+            HAVING max(case when c.other_source = 'wd:id' then 0 else 1 end) = 1
+        `);
 
         if (result.length > 0) {
             list = [
                 ...list,
-                ...result.filter(({ other_id }) => !edited.has( other_id )),
+                ...result,
             ];
         }
     }
@@ -310,24 +323,52 @@ async function main() {
 
     const { csrftoken } = csrfTokenData.query.tokens;
 
+    const otherProperty = 'P1566';
     const wofProperty = 'P6766';
     const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
     for ( { id, placetype, other_id } of list ) {
+        // Search for the item
+        const searchUrl = new URL('https://www.wikidata.org/w/api.php');
+        searchUrl.searchParams.set('action', 'query');
+        searchUrl.searchParams.set('format', 'json');
+        searchUrl.searchParams.set('formatversion', 2);
+        searchUrl.searchParams.set('list', 'search');
+        // Search for the other property, but exclude items that already have a Who's on First ID.
+        searchUrl.searchParams.set('srsearch', `haswbstatement:${otherProperty}=${other_id} -haswbstatement:${wofProperty}`);
+        searchUrl.searchParams.set('srlimit', 1);
+        searchUrl.searchParams.set('srinfo', '');
+        searchUrl.searchParams.set('srprop', '');
+
+        const searchResult = await backoffFetch(searchUrl);
+        const searchData = await searchResult.json();
+
+        if (typeof searchData.query === 'undefined' || typeof searchData.query.search === 'undefined' || searchData.query.search.length === 0 ) {
+            console.log(`Skipping ${id} No Entity Found`);
+            continue;
+        }
+
+        const entityId = searchData.query.search[0].title;
+
+        if ( edited.has( entityId ) ) {
+            console.log(`Skipping ${entityId} Already Edited`);
+            continue;
+        }
+
         const wofUrl = new URL('https://www.wikidata.org/w/api.php');
         wofUrl.searchParams.set('action', 'wbgetclaims');
         wofUrl.searchParams.set('format', 'json');
         wofUrl.searchParams.set('formatversion', 2);
         wofUrl.searchParams.set('property', wofProperty);
-        wofUrl.searchParams.set('entity', other_id);
+        wofUrl.searchParams.set('entity', entityId);
 
         const instanceUrl = new URL('https://www.wikidata.org/w/api.php');
         instanceUrl.searchParams.set('action', 'wbgetclaims');
         instanceUrl.searchParams.set('format', 'json');
         instanceUrl.searchParams.set('formatversion', 2);
         instanceUrl.searchParams.set('property', instanceProperty);
-        instanceUrl.searchParams.set('entity', other_id);
+        instanceUrl.searchParams.set('entity', entityId);
 
         const [
             wofData,
@@ -338,7 +379,7 @@ async function main() {
         ]);
 
         if (typeof wofData.claims === 'undefined' || typeof instanceData.claims === 'undefined') {
-            console.log(`Skipping ${other_id} Error`);
+            console.log(`Skipping ${entityId} Error`);
             console.error(wofData);
             console.error(instanceData);
             continue;
@@ -352,7 +393,7 @@ async function main() {
         if (claims[wofProperty]) {
             const wofIds = claims[wofProperty].map(claim => claim.mainsnak.datavalue.value);
 
-            console.log(`Skipping ${other_id} with ${wofProperty} of ${wofIds.join(', ')}`);
+            console.log(`Skipping ${entityId} with ${wofProperty} of ${wofIds.join(', ')}`);
             continue;
         }
 
@@ -363,19 +404,19 @@ async function main() {
                 const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
 
                 if (!isValidInstance) {
-                    console.log(`Skipping ${other_id} with ${instanceProperty} of ${instanceOf.join(', ')}`);
+                    console.log(`Skipping ${entityId} with ${instanceProperty} of ${instanceOf.join(', ')}`);
                     continue;
                 }
             }
         }
 
-        console.log(`Editing ${other_id} start`);
+        console.log(`Editing ${entityId} start`);
         const editUrl = new URL('https://www.wikidata.org/w/api.php');
         const editFormData = new URLSearchParams();
         editFormData.set('action', 'wbcreateclaim');
         editFormData.set('format', 'json');
         editFormData.set('formatversion', 2);
-        editFormData.set('entity', other_id);
+        editFormData.set('entity', entityId);
         editFormData.set('snaktype', 'value');
         editFormData.set('property', wofProperty);
         // Must be surrounded by quotes!
@@ -388,7 +429,7 @@ async function main() {
             body: editFormData,
         });
 
-        console.log(`Editing ${other_id} end`);
+        console.log(`Editing ${entityId} end`);
 
     }
 }
