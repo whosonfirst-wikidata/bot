@@ -63,7 +63,10 @@ function timeout(ms) {
  */
 async function backoffFetch(input, options, iteration = 0) {
     try {
-        return await fetch(input, options);
+        const response = await fetch(input, options);
+        const data = await response.json();
+
+        return data;
     } catch (e) {
         const seconds = (2 ** iteration);
         console.log(`Request Error, Retrying in ${seconds.toLocaleString()} seconds`);
@@ -345,8 +348,7 @@ async function main() {
         searchUrl.searchParams.set('srinfo', '');
         searchUrl.searchParams.set('srprop', '');
 
-        const searchResult = await backoffFetch(searchUrl);
-        const searchData = await searchResult.json();
+        const searchData = await backoffFetch(searchUrl);
 
         if (typeof searchData.query === 'undefined' || typeof searchData.query.search === 'undefined' || searchData.query.search.length === 0 ) {
             console.log(`Skipping ${id} No Entity Found`);
@@ -367,8 +369,7 @@ async function main() {
         instanceUrl.searchParams.set('property', instanceProperty);
         instanceUrl.searchParams.set('entity', entityId);
 
-        const instanceResponse = await backoffFetch(instanceUrl);
-        const instanceData = await instanceResponse.json();
+        const instanceData = await backoffFetch(instanceUrl);
 
         if (typeof instanceData.claims === 'undefined') {
             console.log(`Skipping ${entityId} Error`);
