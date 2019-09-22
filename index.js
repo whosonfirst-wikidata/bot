@@ -334,28 +334,48 @@ async function main() {
     const wofProperty = 'P6766';
     const instanceProperty = 'P31';
 
+    const entities = new Map();
+    const limit = 5000;
+    let bindings = [];
+    let offset = 0;
+    do {
+        console.log(`Retrieving iteams offset ${offset} start`);
+        const query = `
+            SELECT ?item ?other
+            WHERE
+            {
+                ?item wdt:${otherProperty} ?other.
+                MINUS { ?item wdt:wofProperty [] } .
+            }
+            OFFSET ${offset}
+            LIMIT ${limit}
+        `;
+        const existingUrl = new URL('https://query.wikidata.org/sparql');
+        existingUrl.searchParams.set('format', 'json');
+        existingUrl.searchParams.set('query', query);
+
+        const existingResult = await backoffFetch(existingUrl);
+
+        bindings = existingResult.results.bindings;
+        offset = offset + limit;
+
+        bindings.forEach((result) => {
+            const uri = new URL(result.item.value);
+            const id = uri.pathname.split('/').pop();
+
+            entities.set(parseInt(result.other.value), id);
+        });
+        console.log(`Retrieving iteams offset ${offset} start`);
+    } while ( bindings.length != 0 );
+
     // Edit Wikidata, one at a time.
     for ( { id, placetype, other_id } of list ) {
-        // Search for the item
-        const searchUrl = new URL('https://www.wikidata.org/w/api.php');
-        searchUrl.searchParams.set('action', 'query');
-        searchUrl.searchParams.set('format', 'json');
-        searchUrl.searchParams.set('formatversion', 2);
-        searchUrl.searchParams.set('list', 'search');
-        // Search for the other property, but exclude items that already have a Who's on First ID.
-        searchUrl.searchParams.set('srsearch', `haswbstatement:${otherProperty}=${other_id} -haswbstatement:${wofProperty}`);
-        searchUrl.searchParams.set('srlimit', 1);
-        searchUrl.searchParams.set('srinfo', '');
-        searchUrl.searchParams.set('srprop', '');
-
-        const searchData = await backoffFetch(searchUrl);
-
-        if (typeof searchData.query === 'undefined' || typeof searchData.query.search === 'undefined' || searchData.query.search.length === 0 ) {
+        if (!entities.has(parseInt(other_id))) {
             console.log(`Skipping ${id} No Entity Found`);
             continue;
         }
 
-        const entityId = searchData.query.search[0].title;
+        const entityId = entities.get(parseInt(other_id));
 
         if ( edited.has( entityId ) ) {
             console.log(`Skipping ${entityId} Already Edited`);
@@ -404,13 +424,17 @@ async function main() {
         editFormData.set('token', csrftoken);
         editFormData.set('bot', 1);
 
-        await retryFetch(editUrl, {
+        const editResult = await retryFetch(editUrl, {
             method: 'POST',
             body: editFormData,
         });
 
-        console.log(`Editing ${entityId} end`);
+        if (editResult.errors) {
+            console.error(editResult);
+            throw new Error('Edit Error');
+        }
 
+        console.log(`Editing ${entityId} end`);
     }
 }
 
