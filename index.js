@@ -357,7 +357,6 @@ async function main() {
         const existingResult = await backoffFetch(existingUrl);
 
         bindings = existingResult.results.bindings;
-        offset = offset + limit;
 
         bindings.forEach((result) => {
             const uri = new URL(result.item.value);
@@ -365,7 +364,10 @@ async function main() {
 
             entities.set(parseInt(result.other.value), id);
         });
+
         console.log(`Retrieving iteams offset ${offset} end`);
+
+        offset = offset + limit;
     } while ( bindings.length != 0 );
 
     // Edit Wikidata, one at a time.
