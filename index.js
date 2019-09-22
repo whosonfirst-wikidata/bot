@@ -357,7 +357,7 @@ async function main() {
     let bindings = [];
     let offset = 0;
     do {
-        console.log(`Retrieving iteams offset ${offset} start`);
+        console.log(`Retrieving items offset ${offset} start`);
         const query = `
             SELECT ?item ?other
             WHERE
@@ -383,7 +383,7 @@ async function main() {
             entities.set(parseInt(result.other.value), id);
         });
 
-        console.log(`Retrieving iteams offset ${offset} end`);
+        console.log(`Retrieving items offset ${offset} end`);
 
         offset = offset + limit;
     } while ( bindings.length != 0 );
