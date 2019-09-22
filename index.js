@@ -99,21 +99,29 @@ async function retryFetch(input, options, iteration = 0) {
         if (!response.ok) {
             const seconds = (2 ** iteration);
             console.log(`Request Error: ${response.status} ${repsonse.statusText}`);
-            console.log(`Retrying in ${seconds.toLocaleString()} seconds`);
-            await timeout(seconds * 1000);
-            return retryFetch(input, options, iteration + 1);
+
+            if (response.status >= 500) {
+                console.log(`Retrying in ${seconds.toLocaleString()} seconds`);
+                await timeout(seconds * 1000);
+                return retryFetch(input, options, iteration + 1);
+            }
         }
 
         const data = await response.json();
 
-        if ( data.error && data.error.messages ) {
-            if (data.error.messages.find(({name}) => name === 'actionthrottledtext')) {
-                console.log(`Request Throttled, Retrying in 60 seconds`);
-                await timeout(1000 * 60);
-                return retryFetch(input, options)
-            } else if (data.error.messages.find(({name}) => name === 'no-permission')) {
-                console.error('Permission Denied!');
-                return data;
+        if ( data.error ) {
+            if ( data.error.messages ) {
+                if (data.error.messages.find(({name}) => name === 'actionthrottledtext')) {
+                    console.log(`Request Throttled, Retrying in 60 seconds`);
+                    await timeout(1000 * 60);
+                    return retryFetch(input, options)
+                } else if (data.error.messages.find(({name}) => name === 'no-permission')) {
+                    console.error('Permission Denied!');
+                    return data;
+                } else {
+                    console.error(data.error);
+                    return data;
+                }
             } else {
                 console.error(data.error);
                 return data;
