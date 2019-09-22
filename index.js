@@ -64,13 +64,22 @@ function timeout(ms) {
 async function backoffFetch(input, options, iteration = 0) {
     try {
         const response = await fetch(input, options);
+
+        if (!response.ok) {
+            const seconds = (2 ** iteration);
+            console.log(`Request Error: ${response.status} ${repsonse.statusText}`);
+            console.log(`Retrying in ${seconds.toLocaleString()} seconds`);
+            await timeout(seconds * 1000);
+            return backoffFetch(input, options, iteration + 1);
+        }
+
         const data = await response.json();
 
         return data;
     } catch (e) {
         const seconds = (2 ** iteration);
-        console.log(`Request Error, Retrying in ${seconds.toLocaleString()} seconds`);
-        console.log(e.message);
+        console.log(`Request Error: ${e.message}`);
+        console.log(`Retrying in ${seconds.toLocaleString()} seconds`);
         await timeout(seconds * 1000);
         return backoffFetch(input, options, iteration + 1);
     }
@@ -86,6 +95,15 @@ async function backoffFetch(input, options, iteration = 0) {
 async function retryFetch(input, options, iteration = 0) {
     try {
         const response = await cookieFetch(input, options);
+
+        if (!response.ok) {
+            const seconds = (2 ** iteration);
+            console.log(`Request Error: ${response.status} ${repsonse.statusText}`);
+            console.log(`Retrying in ${seconds.toLocaleString()} seconds`);
+            await timeout(seconds * 1000);
+            return retryFetch(input, options, iteration + 1);
+        }
+
         const data = await response.json();
 
         if ( data.error && data.error.messages ) {
@@ -105,8 +123,8 @@ async function retryFetch(input, options, iteration = 0) {
         return data;
     } catch (e) {
         const seconds = (2 ** iteration);
-        console.log(`Request Error, Retrying in ${seconds.toLocaleString()} seconds`);
-        console.log(e.message);
+        console.log(`Request Error: ${e.message}`);
+        console.log(`Retrying in ${seconds.toLocaleString()} seconds`);
         await timeout(seconds * 1000);
         return retryFetch(input, options, iteration + 1);
     }
