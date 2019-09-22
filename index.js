@@ -365,7 +365,7 @@ async function main() {
 
             entities.set(parseInt(result.other.value), id);
         });
-        console.log(`Retrieving iteams offset ${offset} start`);
+        console.log(`Retrieving iteams offset ${offset} end`);
     } while ( bindings.length != 0 );
 
     // Edit Wikidata, one at a time.
