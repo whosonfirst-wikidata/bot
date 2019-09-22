@@ -4,7 +4,6 @@ const { promisify } = require('util');
 const child_process = require('child_process');
 const { fromFile: hashFromFile } = require('hasha');
 const fetch = require('node-fetch');
-const { remove } = require('fs-extra');
 const { DateTime } = require('luxon');
 const promisePipe = require('promisepipe');
 const { open } = require('sqlite');
@@ -136,6 +135,18 @@ async function retryFetch(input, options, iteration = 0) {
         await timeout(seconds * 1000);
         return retryFetch(input, options, iteration + 1);
     }
+}
+
+async function getToken() {
+    const url = new URL('https://www.wikidata.org/w/api.php');
+    url.searchParams.set('action', 'query');
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('formatversion', 2);
+    url.searchParams.set('meta', 'tokens');
+
+    const data = await retryFetch(url);
+
+    return data.query.tokens.csrftoken;
 }
 
 async function main() {
@@ -345,17 +356,6 @@ async function main() {
 
     console.log(`Number of Wikidata items to edit: ${list.length.toLocaleString()}`);
 
-    const csrfTokenUrl = new URL('https://www.wikidata.org/w/api.php');
-    csrfTokenUrl.searchParams.set('action', 'query');
-    csrfTokenUrl.searchParams.set('format', 'json');
-    csrfTokenUrl.searchParams.set('formatversion', 2);
-    csrfTokenUrl.searchParams.set('meta', 'tokens');
-
-    const csrfTokenResponse = await cookieFetch(csrfTokenUrl);
-    const csrfTokenData = await csrfTokenResponse.json();
-
-    const { csrftoken } = csrfTokenData.query.tokens;
-
     const otherProperty = 'P1566';
     const wofProperty = 'P6766';
     const instanceProperty = 'P31';
@@ -417,6 +417,9 @@ async function main() {
         }
 
         console.log(`Editing ${entityId} start`);
+
+        const token = await getToken();
+
         const editUrl = new URL('https://www.wikidata.org/w/api.php');
         const editFormData = new URLSearchParams();
         editFormData.set('action', 'wbcreateclaim');
@@ -427,7 +430,7 @@ async function main() {
         editFormData.set('property', wofProperty);
         // Must be surrounded by quotes!
         editFormData.set('value', `"${id}"`);
-        editFormData.set('token', csrftoken);
+        editFormData.set('token', token);
         editFormData.set('bot', 1);
 
         await retryFetch(editUrl, {

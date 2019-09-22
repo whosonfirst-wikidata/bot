@@ -12,7 +12,6 @@
     "@commaai/unbzip2-stream": "^2.0.0",
     "commander": "^3.0.0",
     "fetch-cookie": "^0.7.3",
-    "fs-extra": "^8.1.0",
     "hasha": "^5.0.0",
     "luxon": "^1.17.2",
     "node-fetch": "^2.6.0",
