@@ -337,7 +337,7 @@ async function main() {
             FROM spr
             INNER JOIN concordances AS c ON spr.id = c.id
             WHERE
-                spr.is_current = 1
+                spr.is_current != 0
                 AND c.other_source = 'gn:id'
                 AND c.other_id NOT IN (-99, -1, 0)
             GROUP BY spr.id
