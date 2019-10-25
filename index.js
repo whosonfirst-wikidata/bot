@@ -344,12 +344,18 @@ async function main() {
             wofData
             && wofData.claims
             && wofData.claims[wofProperty]
-            && wofData.claims[wofProperty][0]
-            && wofData.claims[wofProperty][0].mainsnak
-            && wofData.claims[wofProperty][0].mainsnak.datavalue
-            && wofData.claims[wofProperty][0].mainsnak.datavalue.value
+            && Array.isArray(wofData.claims[wofProperty])
+            && wofData.claims[wofProperty].length > 0
         ) {
-            wofIds.add( parseInt(wofData.claims[wofProperty][0].mainsnak.datavalue.value, 10) );
+            wofData.claims[wofProperty].forEach((claim) => {
+                if (
+                    claim.mainsnak
+                    && claim.mainsnak.datavalue
+                    && claim.mainsnak.datavalue.value
+                ) {
+                    wofIds.add( parseInt(claim.mainsnak.datavalue.value, 10) );
+                }
+            });
         }
     }
 
