@@ -401,7 +401,6 @@ async function main() {
     console.log(`Number of Wikidata items to edit: ${items.size.toLocaleString()}`);
 
     const otherProperty = 'P1566';
-    const wofProperty = 'P6766';
     const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
