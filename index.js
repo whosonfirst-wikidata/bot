@@ -338,8 +338,7 @@ async function main() {
         wofUrl.searchParams.set('entity', entity);
         wofUrl.searchParams.set('property', wofProperty);
 
-        const wofResponse = await retryFetch(wofUrl);
-        const wofData = await wofResponse.json();
+        const wofData = await retryFetch(wofUrl);
 
         if (
             wofData
