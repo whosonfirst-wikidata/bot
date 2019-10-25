@@ -372,7 +372,6 @@ async function main() {
                 AND c.other_source = 'gn:id'
                 AND c.other_id NOT IN (-99, -1, 0)
             GROUP BY spr.id
-            HAVING NOT c.other_source = 'wd:id'
         `);
 
         if (result.length > 0) {
