@@ -300,8 +300,10 @@ async function main() {
 
     let cont = null;
     let edited = new Set();
+    console.log(`Retreiving contributions`);
     while (cont !== false) {
         if ( cont ) {
+            console.log(`Retreiving contributions ${cont}`);
             userContribsUrl.searchParams.set('uccontinue', cont);
         }
         const userContribsResponse = await cookieFetch(userContribsUrl);
@@ -320,7 +322,37 @@ async function main() {
         }
     }
 
-    console.log(`Number of items edited previously: ${edited.size.toLocaleString()}`)
+    console.log(`Number of items edited previously: ${edited.size.toLocaleString()}`);
+
+    const wofProperty = 'P6766';
+
+    // Loop through and get the Who's on First id for each item previously edited.
+    const wofIds = new Set();
+    for ( let entity of edited ) {
+        console.log(`Retrieving Who's on First ID for ${entity}`);
+
+        const wofUrl = new URL('https://www.wikidata.org/w/api.php');
+        wofUrl.searchParams.set('action', 'wbgetclaims');
+        wofUrl.searchParams.set('format', 'json');
+        wofUrl.searchParams.set('formatversion', 2);
+        wofUrl.searchParams.set('entity', entity);
+        wofUrl.searchParams.set('property', wofProperty);
+
+        const wofResponse = await retryFetch(wofUrl);
+        const wofData = await wofResponse.json();
+
+        if (
+            wofData
+            && wofData.claims
+            && wofData.claims[wofProperty]
+            && wofData.claims[wofProperty][0]
+            && wofData.claims[wofProperty][0].mainsnak
+            && wofData.claims[wofProperty][0].mainsnak.datavalue
+            && wofData.claims[wofProperty][0].mainsnak.datavalue.value
+        ) {
+            wofIds.add( parseInt(wofData.claims[wofProperty][0].mainsnak.datavalue.value, 10) );
+        }
+    }
 
     let list = [];
 
@@ -354,14 +386,26 @@ async function main() {
         console.log(`Querying ${file.name} end`);
     }
 
-    console.log(`Number of Wikidata items to edit: ${list.length.toLocaleString()}`);
+    // Remove any duplicates
+    const items = list.reduce(( map, item ) => {
+        map.set( parseInt( item.id, 10 ), item);
+    }, new Map());
+
+    // Remove items that already have a Wikidata item
+    for ( let wofId of wofIds ) {
+        if ( items.has( wofId ) ) {
+            items.delete( wofId );
+        }
+    }
+
+    console.log(`Number of Wikidata items to edit: ${items.size.toLocaleString()}`);
 
     const otherProperty = 'P1566';
     const wofProperty = 'P6766';
     const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
-    for ( { id, placetype, other_id } of list ) {
+    for ( { id, placetype, other_id } of items.values() ) {
         // Search for the item
         const searchUrl = new URL('https://www.wikidata.org/w/api.php');
         searchUrl.searchParams.set('action', 'query');
