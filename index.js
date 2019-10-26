@@ -360,10 +360,7 @@ async function main() {
 
             wofIds.add( parseInt(row.wof, 10) );
         } );
-        continue;
     }
-
-
 
     for ( const entity of missingEntity ) {
         console.log(`Retrieving Who's on First ID for ${entity}`);
