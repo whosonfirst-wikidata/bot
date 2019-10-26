@@ -346,7 +346,7 @@ async function main() {
 
     // Loop through and get the Who's on First id for each item previously edited.
     const wofIds = new Set();
-    for ( let entity of edited ) {
+    for ( const entity of edited ) {
 
         const result = await db.all('SELECT wof FROM map WHERE wd = ?', entity);
 
@@ -375,7 +375,7 @@ async function main() {
             && Array.isArray(wofData.claims[wofProperty])
             && wofData.claims[wofProperty].length > 0
         ) {
-            wofData.claims[wofProperty].forEach((claim) => {
+            for ( const claim of wofData.claims[wofProperty] ) {
                 if (
                     claim.mainsnak
                     && claim.mainsnak.datavalue
@@ -385,14 +385,14 @@ async function main() {
                     await db.run(`INSERT INTO map VALUES (?, ?)`, entity, wofId );
                     wofIds.add( wofId );
                 }
-            });
+            }
         }
     }
 
     let list = [];
 
     // Query the number of wikidata items for each database.
-    for ( file of files ) {
+    for ( const file of files ) {
         console.log(`Querying ${file.name} start`);
 
         const wofDB = await open(resolve(downloadsFolder, file.name));
@@ -438,7 +438,7 @@ async function main() {
     const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
-    for ( { id, placetype, other_id } of items.values() ) {
+    for ( const { id, placetype, other_id } of items.values() ) {
         // Search for the item
         const searchUrl = new URL('https://www.wikidata.org/w/api.php');
         searchUrl.searchParams.set('action', 'query');
