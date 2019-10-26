@@ -347,7 +347,7 @@ async function main() {
     // Loop through and get the Who's on First id for each item previously edited.
     const wofIds = new Set();
 
-    const result = await db.all('SELECT wd, wof FROM map', entity);
+    const result = await db.all('SELECT wd, wof FROM map');
 
     const missingEntity = new Set(edited);
 
