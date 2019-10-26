@@ -324,11 +324,39 @@ async function main() {
 
     console.log(`Number of items edited previously: ${edited.size.toLocaleString()}`);
 
+    const dataFolder = resolve(__dirname, 'data');
+    try {
+        await mkdir(dataFolder);
+    } catch (e) {
+        if (e.code !== 'EEXIST') {
+            throw e;
+        }
+    }
+    const db = await open(resolve(dataFolder, 'data.sqlite'));
+
+    await db.run(`
+        CREATE TABLE IF NOT EXISTS map (
+            wd TEXT NOT NULL,
+            wof INTEGER NOT NULL,
+            PRIMARY KEY (wd, wof)
+        );
+    `);
+
     const wofProperty = 'P6766';
 
     // Loop through and get the Who's on First id for each item previously edited.
     const wofIds = new Set();
     for ( let entity of edited ) {
+
+        const result = await db.all('SELECT wof FROM map WHERE wd = ?', entity);
+
+        if ( result.length > 0 ) {
+            result.forEach( ( row ) => {
+                wofIds.add( parseInt(row.wof, 10) );
+            } );
+            continue;
+        }
+
         console.log(`Retrieving Who's on First ID for ${entity}`);
 
         const wofUrl = new URL('https://www.wikidata.org/w/api.php');
@@ -353,7 +381,9 @@ async function main() {
                     && claim.mainsnak.datavalue
                     && claim.mainsnak.datavalue.value
                 ) {
-                    wofIds.add( parseInt(claim.mainsnak.datavalue.value, 10) );
+                    const wofId = parseInt(claim.mainsnak.datavalue.value, 10);
+                    await db.run(`INSERT INTO map VALUES (?, ?)`, entity, wofId );
+                    wofIds.add( wofId );
                 }
             });
         }
@@ -365,8 +395,8 @@ async function main() {
     for ( file of files ) {
         console.log(`Querying ${file.name} start`);
 
-        const db = await open(resolve(downloadsFolder, file.name));
-        const result = await db.all(`
+        const wofDB = await open(resolve(downloadsFolder, file.name));
+        const result = await wofDB.all(`
             SELECT
                 spr.id,
                 spr.placetype,
