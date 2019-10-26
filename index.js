@@ -346,17 +346,26 @@ async function main() {
 
     // Loop through and get the Who's on First id for each item previously edited.
     const wofIds = new Set();
-    for ( const entity of edited ) {
 
-        const result = await db.all('SELECT wof FROM map WHERE wd = ?', entity);
+    const result = await db.all('SELECT wd, wof FROM map', entity);
 
-        if ( result.length > 0 ) {
-            result.forEach( ( row ) => {
-                wofIds.add( parseInt(row.wof, 10) );
-            } );
-            continue;
-        }
+    const missingEntity = new Set(edited);
 
+    if ( result.length > 0 ) {
+        result.forEach( ( row ) => {
+            // Remove items we already know about from the list of what needs updating
+            if ( missingEntity.has( row.wd ) ) {
+                missingEntity.delete( row.wd );
+            }
+
+            wofIds.add( parseInt(row.wof, 10) );
+        } );
+        continue;
+    }
+
+
+
+    for ( const entity of missingEntity ) {
         console.log(`Retrieving Who's on First ID for ${entity}`);
 
         const wofUrl = new URL('https://www.wikidata.org/w/api.php');
