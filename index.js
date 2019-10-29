@@ -13,42 +13,6 @@ const mkdir = promisify(fs.mkdir);
 const unlink = promisify(fs.unlink);
 const exec = promisify(child_process.exec);
 
-const placetypes = new Map(Object.entries({
-    address: 'Q319608',
-    arcade: 'Q11315',
-    borough: 'Q5195043',
-    building: 'Q41176',
-    campus: 'Q209465',
-    concourse: 'Q862212',
-    constituency: 'Q192611',
-    continent: 'Q5107',
-    country: 'Q6256',
-    county: 'Q28575',
-    dependency: 'Q161243',
-    disputed: 'Q15239622',
-    empire: 'Q48349',
-    enclosure: 'Q5375483',
-    installation: 'Q20437094',
-    intersection: 'Q285783',
-    localadmin: 'Q66941850',
-    locality: 'Q486972',
-    macrocounty: 'Q66980082',
-    macrohood: 'Q66980180',
-    macroregion: 'Q3434769',
-    marinearea: 'Q66980635',
-    marketarea: 'Q6770790',
-    metroarea: 'Q1907114',
-    microhood: 'Q66980952',
-    neighbourhood: 'Q123705',
-    ocean: 'Q9430',
-    planet: 'Q634',
-    postalcode: 'Q37447',
-    region: 'Q3455524',
-    timezone: 'Q12143',
-    venue: 'Q17350442',
-    wing: 'Q1125776',
-}));
-
 function timeout(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -231,29 +195,6 @@ async function main() {
         console.log(`Decompressing ${file.name_compressed} end`);
     }
 
-    for ([type, id] of placetypes ) {
-        const query = `SELECT ?item
-        WHERE {
-            ?item wdt:P279* wd:${id}.
-        }`;
-        const queryUrl = new URL('https://query.wikidata.org/sparql');
-        queryUrl.searchParams.set('query', query);
-        queryUrl.searchParams.set('format', 'json');
-
-        const result = await fetch(queryUrl);
-        const data = await result.json();
-
-        const ids = data.results.bindings.map(({ item }) => {
-            const uri = new URL(item.value);
-
-            return uri.pathname.split('/').pop();
-        });
-
-        // Set the placetype implementations.
-        console.log(`Class ${id} is subclassed by ${ids.length.toLocaleString()} items`)
-        placetypes.set(type, new Set(ids));
-    }
-
     const loginTokenUrl = new URL('https://www.wikidata.org/w/api.php');
     loginTokenUrl.searchParams.set('action', 'query');
     loginTokenUrl.searchParams.set('format', 'json');
@@ -342,8 +283,6 @@ async function main() {
         );
     `);
 
-    const wofProperty = 'P6766';
-
     // Loop through and get the Who's on First id for each item previously edited.
     const wofIds = new Set();
 
@@ -361,6 +300,8 @@ async function main() {
             wofIds.add( parseInt(row.wof, 10) );
         } );
     }
+
+    const wofProperty = 'P6766';
 
     for ( const entity of missingEntity ) {
         console.log(`Retrieving Who's on First ID for ${entity}`);
@@ -405,7 +346,6 @@ async function main() {
         const result = await wofDB.all(`
             SELECT
                 spr.id,
-                spr.placetype,
                 c.other_id
             FROM spr
             INNER JOIN concordances AS c ON spr.id = c.id
@@ -429,6 +369,7 @@ async function main() {
     // Remove any duplicates
     const items = list.reduce(( map, item ) => {
         map.set( parseInt( item.id, 10 ), item);
+        return map;
     }, new Map());
 
     // Remove items that already have a Wikidata item
@@ -444,7 +385,7 @@ async function main() {
     const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
-    for ( const { id, placetype, other_id } of items.values() ) {
+    for ( const { id, other_id } of items.values() ) {
         // Search for the item
         const searchUrl = new URL('https://www.wikidata.org/w/api.php');
         searchUrl.searchParams.set('action', 'query');
@@ -469,34 +410,6 @@ async function main() {
         if ( edited.has( entityId ) ) {
             console.log(`Skipping ${entityId} Already Edited`);
             continue;
-        }
-
-        const instanceUrl = new URL('https://www.wikidata.org/w/api.php');
-        instanceUrl.searchParams.set('action', 'wbgetclaims');
-        instanceUrl.searchParams.set('format', 'json');
-        instanceUrl.searchParams.set('formatversion', 2);
-        instanceUrl.searchParams.set('property', instanceProperty);
-        instanceUrl.searchParams.set('entity', entityId);
-
-        const instanceData = await backoffFetch(instanceUrl);
-
-        if (typeof instanceData.claims === 'undefined') {
-            console.log(`Skipping ${entityId} Error`);
-            console.error(instanceData);
-            continue;
-        }
-
-        if (instanceData.claims[instanceProperty]) {
-            const instanceOf = instanceData.claims[instanceProperty].map(claim => claim.mainsnak.datavalue.value.id);
-
-            if (instanceOf.length > 0) {
-                const isValidInstance = instanceOf.find(id => placetypes.get(placetype).has(id));
-
-                if (!isValidInstance) {
-                    console.log(`Skipping ${entityId} with ${instanceProperty} of ${instanceOf.join(', ')}`);
-                    continue;
-                }
-            }
         }
 
         console.log(`Editing ${entityId} start`);
