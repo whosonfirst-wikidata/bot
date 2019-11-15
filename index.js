@@ -275,17 +275,26 @@ async function main() {
     }
     const db = await open(resolve(dataFolder, 'data.sqlite'));
 
-    await db.run(`
+    const createMapTable = db.run(`
         CREATE TABLE IF NOT EXISTS map (
             wd TEXT NOT NULL,
             wof INTEGER NOT NULL,
             PRIMARY KEY (wd, wof)
         );
     `);
+    const otherName = 'geonames';
+    const createOtherTable = db.run(`
+        CREATE TABLE IF NOT EXISTS ${otherName} (
+            id INTEGER NOT NULL,
+            PRIMARY KEY (id)
+        );
+    `);
 
     // Loop through and get the Who's on First id for each item previously edited.
     const wofIds = new Set();
 
+    // Wait for the table creation to finish.
+    await createMapTable;
     const result = await db.all('SELECT wd, wof FROM map');
 
     const missingEntity = new Set(edited);
@@ -379,10 +388,22 @@ async function main() {
         }
     }
 
+    // Wait for the table creation to finish.
+    await createOtherTable;
+    // Get all of the existing ids that are known to be missing.
+    const otherRows = await db.all(`SELECT id FROM ${otherName}`);
+    const others = new Set(otherRows.map(row => parseInt(row.id, 10)));
+
+    // Remove any items that are known to not exist.
+    for ( const [key, { other_id }] of items.entries() ) {
+        if (others.has(parseInt(other_id, 10))) {
+            items.delete(key);
+        }
+    }
+
     console.log(`Number of Wikidata items to edit: ${items.size.toLocaleString()}`);
 
     const otherProperty = 'P1566';
-    const instanceProperty = 'P31';
 
     // Edit Wikidata, one at a time.
     for ( const { id, other_id } of items.values() ) {
@@ -402,6 +423,8 @@ async function main() {
 
         if (typeof searchData.query === 'undefined' || typeof searchData.query.search === 'undefined' || searchData.query.search.length === 0 ) {
             console.log(`Skipping ${id} No Entity Found`);
+            // Don't wait for the SQL query to finish before proceeding to the next value.
+            db.run(`INSERT OR IGNORE INTO ${otherName} VALUES (?)`, other_id);
             continue;
         }
 
