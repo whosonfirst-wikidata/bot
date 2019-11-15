@@ -405,8 +405,11 @@ async function main() {
 
     const otherProperty = 'P1566';
 
+    let i = 0;
     // Edit Wikidata, one at a time.
     for ( const { id, other_id } of items.values() ) {
+        i++;
+        const percent = Math.floor((i / items.size) * 100);
         // Search for the item
         const searchUrl = new URL('https://www.wikidata.org/w/api.php');
         searchUrl.searchParams.set('action', 'query');
@@ -422,7 +425,7 @@ async function main() {
         const searchData = await backoffFetch(searchUrl);
 
         if (typeof searchData.query === 'undefined' || typeof searchData.query.search === 'undefined' || searchData.query.search.length === 0 ) {
-            console.log(`Skipping ${id} No Entity Found`);
+            console.log(`(${percent}%) Skipping ${id} No Entity Found`);
             // Don't wait for the SQL query to finish before proceeding to the next value.
             db.run(`INSERT OR IGNORE INTO ${otherName} VALUES (?)`, other_id);
             continue;
@@ -431,11 +434,11 @@ async function main() {
         const entityId = searchData.query.search[0].title;
 
         if ( edited.has( entityId ) ) {
-            console.log(`Skipping ${entityId} Already Edited`);
+            console.log(`(${percent}%) Skipping ${entityId} Already Edited`);
             continue;
         }
 
-        console.log(`Editing ${entityId} start`);
+        console.log(`(${percent}%) Editing ${entityId} start`);
 
         const token = await getToken();
 
@@ -457,7 +460,7 @@ async function main() {
             body: editFormData,
         });
 
-        console.log(`Editing ${entityId} end`);
+        console.log(`(${percent}%) Editing ${entityId} end`);
 
     }
 }
