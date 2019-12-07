@@ -282,7 +282,7 @@ async function main() {
             PRIMARY KEY (wd, wof)
         );
     `);
-    const otherName = 'geonames';
+    const otherName = 'woeid';
     const createOtherTable = db.run(`
         CREATE TABLE IF NOT EXISTS ${otherName} (
             id INTEGER NOT NULL,
@@ -352,6 +352,7 @@ async function main() {
         console.log(`Querying ${file.name} start`);
 
         const wofDB = await open(resolve(downloadsFolder, file.name));
+        const otherSource = 'gp:id';
         const result = await wofDB.all(`
             SELECT
                 spr.id,
@@ -360,10 +361,10 @@ async function main() {
             INNER JOIN concordances AS c ON spr.id = c.id
             WHERE
                 spr.is_current != 0
-                AND c.other_source = 'gn:id'
+                AND c.other_source = ?
                 AND c.other_id NOT IN (-99, -1, 0)
             GROUP BY spr.id
-        `);
+        `, otherSource);
 
         if (result.length > 0) {
             list = [
@@ -403,7 +404,7 @@ async function main() {
 
     console.log(`Number of Wikidata items to edit: ${items.size.toLocaleString()}`);
 
-    const otherProperty = 'P1566';
+    const otherProperty = 'P1281';
 
     let i = 0;
     // Edit Wikidata, one at a time.
