@@ -14,7 +14,7 @@
     "fetch-cookie": "^0.7.3",
     "hasha": "^5.0.0",
     "luxon": "^1.17.2",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^3.1.1",
     "promisepipe": "^3.0.0",
     "sqlite": "^3.0.3"
   }
